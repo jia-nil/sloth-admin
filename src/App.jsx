@@ -6,8 +6,8 @@ import { useState, useEffect, useRef } from "react";
 // Admin users only — protected by RLS on the questions table.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SUPABASE_URL  = "https://tlmazdrnndylafhfxsrc.supabase.co";
-const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsbWF6ZHJubmR5bGFmaGZ4c3JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1ODEwNjAsImV4cCI6MjA4ODE1NzA2MH0.gGPknDEdaGfzDb2JJ2amEY9b33jlbTY3brvbbhvvIWg";
+const SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co";
+const SUPABASE_KEY  = "YOUR_ANON_KEY";
 
 const SUBJECTS = ["Physics","Chemistry","Mathematics"];
 const TOPICS = {
@@ -121,31 +121,184 @@ const BLANK_Q = {
   marks:4,negative:-1,has_image:false,is_verified:false,is_active:true,source_note:"",
 };
 
-// ── Math renderer: converts \sqrt{}, ^{2}, \tan^{-1}, Greek letters etc ─────
-// ── Math renderer ─────────────────────────────────────────────────────────────
+// ── Math renderer — proper stacked fractions via JSX ─────────────────────────
+// Parses a LaTeX-subset string into tokens, renders as React elements.
+// Supports: \frac{}{}, \sqrt{}, ^{}, _{}, Greek, trig inverses, operators.
+
+function parseMath(raw) {
+  // Returns array of token objects: {t:"txt"|"frac"|"sqrt"|"sup"|"sub", ...}
+  const out = [];
+  let i = 0;
+  const BSRE = /^\\([a-zA-Z]+|\^)/;
+
+  function readBraced(from) {
+    // reads {content} starting at from, returns [content, endIndex]
+    if (raw[from] !== '{') return ['', from];
+    let depth = 1, j = from + 1, buf = '';
+    while (j < raw.length && depth > 0) {
+      if (raw[j] === '{') depth++;
+      else if (raw[j] === '}') depth--;
+      if (depth > 0) buf += raw[j];
+      j++;
+    }
+    return [buf, j];
+  }
+
+  while (i < raw.length) {
+    const ch = raw[i];
+
+    // backslash command
+    if (ch === '\\') {
+      const m = raw.slice(i).match(BSRE);
+      if (!m) { pushTxt('\\'); i++; continue; }
+      const cmd = m[1];
+      i += 1 + cmd.length;
+
+      if (cmd === 'frac') {
+        const [num, i2] = readBraced(i);
+        const [den, i3] = readBraced(i2);
+        out.push({ t: 'frac', num, den });
+        i = i3; continue;
+      }
+      if (cmd === 'sqrt') {
+        const [inner, i2] = readBraced(i);
+        out.push({ t: 'sqrt', inner });
+        i = i2; continue;
+      }
+      // trig inverses: \tan^{-1}
+      if ((cmd === 'tan' || cmd === 'sin' || cmd === 'cos') && raw.slice(i, i+4) === '^{-1') {
+        out.push({ t: 'txt', v: cmd + '\u207b\u00b9' }); // ⁻¹
+        i += 5; continue; // skip ^{-1}
+      }
+      const SYMS = {
+        alpha:'α',beta:'β',gamma:'γ',delta:'δ',Delta:'Δ',theta:'θ',phi:'φ',
+        pi:'π',omega:'ω',Omega:'Ω',mu:'μ',lambda:'λ',sigma:'σ',epsilon:'ε',
+        rho:'ρ',eta:'η',xi:'ξ',zeta:'ζ',Lambda:'Λ',Gamma:'Γ',Phi:'Φ',Psi:'Ψ',
+        tau:'τ',nu:'ν',kappa:'κ',
+        tan:'tan',sin:'sin',cos:'cos',log:'log',ln:'ln',
+        arctan:'tan⁻¹',arcsin:'sin⁻¹',arccos:'cos⁻¹',
+        rightarrow:'→',leftarrow:'←',to:'→',Rightarrow:'⇒',leftrightarrow:'↔',
+        times:'×',cdot:'·',div:'÷',leq:'≤',geq:'≥',neq:'≠',
+        approx:'≈',infty:'∞',pm:'±',mp:'∓',circ:'°',degree:'°',
+        int:'∫',sum:'Σ',prod:'Π',partial:'∂',nabla:'∇',
+        forall:'∀',exists:'∃',
+      };
+      pushTxt(SYMS[cmd] ?? '');
+      continue;
+    }
+
+    // superscript  ^{...} or ^digit
+    if (ch === '^') {
+      if (raw[i+1] === '{') {
+        const [val, i2] = readBraced(i+1);
+        out.push({ t: 'sup', v: val });
+        i = i2; continue;
+      }
+      if (/\d/.test(raw[i+1])) { out.push({ t: 'sup', v: raw[i+1] }); i+=2; continue; }
+    }
+
+    // subscript  _{...} or _digit
+    if (ch === '_') {
+      if (raw[i+1] === '{') {
+        const [val, i2] = readBraced(i+1);
+        out.push({ t: 'sub', v: val });
+        i = i2; continue;
+      }
+      if (/\d/.test(raw[i+1])) { out.push({ t: 'sub', v: raw[i+1] }); i+=2; continue; }
+    }
+
+    pushTxt(ch); i++;
+  }
+
+  function pushTxt(c) {
+    const last = out[out.length - 1];
+    if (last && last.t === 'txt') last.v += c;
+    else out.push({ t: 'txt', v: c });
+  }
+
+  return out;
+}
+
+function MathText({ t, style }) {
+  if (!t) return null;
+  const tokens = parseMath(t);
+  return (
+    <span style={style}>
+      {tokens.map((tok, i) => {
+        if (tok.t === 'txt') return <span key={i}>{tok.v}</span>;
+
+        if (tok.t === 'sup') return (
+          <sup key={i} style={{fontSize:'0.72em',lineHeight:0,verticalAlign:'super',position:'relative',top:'-0.3em'}}>
+            <MathText t={tok.v}/>
+          </sup>
+        );
+
+        if (tok.t === 'sub') return (
+          <sub key={i} style={{fontSize:'0.72em',lineHeight:0,verticalAlign:'sub',position:'relative',bottom:'-0.2em'}}>
+            <MathText t={tok.v}/>
+          </sub>
+        );
+
+        if (tok.t === 'sqrt') return (
+          <span key={i} style={{display:'inline-flex',alignItems:'stretch',verticalAlign:'middle',margin:'0 1px'}}>
+            <span style={{fontSize:'1.2em',lineHeight:1,paddingRight:1,alignSelf:'center'}}>√</span>
+            <span style={{borderTop:'1.5px solid currentColor',paddingTop:1,paddingLeft:2,paddingRight:3}}>
+              <MathText t={tok.inner}/>
+            </span>
+          </span>
+        );
+
+        if (tok.t === 'frac') return (
+          <span key={i} style={{
+            display:'inline-flex',flexDirection:'column',alignItems:'center',
+            verticalAlign:'middle',margin:'0 3px',lineHeight:1.15,
+          }}>
+            <span style={{
+              borderBottom:'1.5px solid currentColor',
+              paddingBottom:2,paddingLeft:4,paddingRight:4,
+              whiteSpace:'nowrap',textAlign:'center',fontSize:'0.88em',
+            }}>
+              <MathText t={tok.num}/>
+            </span>
+            <span style={{
+              paddingTop:2,paddingLeft:4,paddingRight:4,
+              whiteSpace:'nowrap',textAlign:'center',fontSize:'0.88em',
+            }}>
+              <MathText t={tok.den}/>
+            </span>
+          </span>
+        );
+
+        return null;
+      })}
+    </span>
+  );
+}
+
+// Plain-text fallback for non-JSX contexts (list views, etc.)
 function renderMath(text) {
   if (!text) return text;
   return text
-    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,"($1)/($2)")
-    .replace(/\\sqrt\{([^}]+)\}/g,"√($1)")
-    .replace(/\\sqrt(?![{])/g,"√")
-    .replace(/\^\{([^}]+)\}/g,(_,p)=>{const m={"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","n":"ⁿ","x":"ˣ","-":"⁻","a":"ᵃ","b":"ᵇ","+":"⁺"};return p.split("").map(c=>m[c]||c).join("");})
-    .replace(/\^(\d)/g,(_,d)=>"⁰¹²³⁴⁵⁶⁷⁸⁹"[d])
-    .replace(/\_\{([^}]+)\}/g,(_,s)=>{const m={"0":"₀","1":"₁","2":"₂","3":"₃","4":"₄","5":"₅","6":"₆","7":"₇","8":"₈","9":"₉","n":"ₙ","x":"ₓ"};return s.split("").map(c=>m[c]||c).join("");})
-    .replace(/_(\d)/g,(_,d)=>"₀₁₂₃₄₅₆₇₈₉"[d])
-    .replace(/\\tan\^\{-1\}|\\arctan/g,"tan⁻¹").replace(/\\sin\^\{-1\}|\\arcsin/g,"sin⁻¹").replace(/\\cos\^\{-1\}|\\arccos/g,"cos⁻¹")
-    .replace(/\\tan(?![a-z])/g,"tan").replace(/\\sin(?![a-z])/g,"sin").replace(/\\cos(?![a-z])/g,"cos")
-    .replace(/\\alpha/g,"α").replace(/\\beta/g,"β").replace(/\\gamma/g,"γ").replace(/\\delta/g,"δ")
-    .replace(/\\Delta/g,"Δ").replace(/\\theta/g,"θ").replace(/\\phi/g,"φ").replace(/\\pi(?![a-z])/g,"π")
-    .replace(/\\omega/g,"ω").replace(/\\Omega/g,"Ω").replace(/\\mu(?![a-z])/g,"μ").replace(/\\lambda/g,"λ")
-    .replace(/\\sigma/g,"σ").replace(/\\epsilon/g,"ε").replace(/\\rho/g,"ρ")
-    .replace(/\\rightarrow|\\to(?![a-z])/g,"→").replace(/\\leftarrow/g,"←").replace(/\\Rightarrow/g,"⇒")
-    .replace(/\\times/g,"×").replace(/\\cdot/g,"·").replace(/\\div/g,"÷")
-    .replace(/\\leq/g,"≤").replace(/\\geq/g,"≥").replace(/\\neq/g,"≠").replace(/\\approx/g,"≈")
-    .replace(/\\infty/g,"∞").replace(/\\pm/g,"±").replace(/\\circ/g,"°").replace(/\\degree/g,"°")
-    .replace(/\\int(?![a-z])/g,"∫").replace(/\\sum/g,"Σ").replace(/\\partial/g,"∂")
-    .replace(/\\[a-zA-Z]+/g,"");
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,'($1)/($2)')
+    .replace(/\\sqrt\{([^}]+)\}/g,'√($1)').replace(/\\sqrt(?![{])/g,'√')
+    .replace(/\^\{([^}]+)\}/g,(_,p)=>{const m={'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','n':'ⁿ','-':'⁻'};return p.split('').map(c=>m[c]||c).join('');})
+    .replace(/\^(\d)/g,(_,d)=>'⁰¹²³⁴⁵⁶⁷⁸⁹'[d])
+    .replace(/\_\{([^}]+)\}/g,(_,s)=>{const m={'0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉'};return s.split('').map(c=>m[c]||c).join('');})
+    .replace(/_(\d)/g,(_,d)=>'₀₁₂₃₄₅₆₇₈₉'[d])
+    .replace(/\\arctan/g,'tan⁻¹').replace(/\\arcsin/g,'sin⁻¹').replace(/\\arccos/g,'cos⁻¹')
+    .replace(/\\tan\^{-1}/g,'tan⁻¹').replace(/\\sin\^{-1}/g,'sin⁻¹').replace(/\\cos\^{-1}/g,'cos⁻¹')
+    .replace(/\\alpha/g,'α').replace(/\\beta/g,'β').replace(/\\gamma/g,'γ').replace(/\\delta/g,'δ')
+    .replace(/\\Delta/g,'Δ').replace(/\\theta/g,'θ').replace(/\\phi/g,'φ').replace(/\\pi/g,'π')
+    .replace(/\\omega/g,'ω').replace(/\\Omega/g,'Ω').replace(/\\mu/g,'μ').replace(/\\lambda/g,'λ')
+    .replace(/\\sigma/g,'σ').replace(/\\epsilon/g,'ε').replace(/\\rho/g,'ρ')
+    .replace(/\\to(?![a-z])/g,'→').replace(/\\rightarrow/g,'→').replace(/\\times/g,'×')
+    .replace(/\\leq/g,'≤').replace(/\\geq/g,'≥').replace(/\\neq/g,'≠').replace(/\\approx/g,'≈')
+    .replace(/\\infty/g,'∞').replace(/\\pm/g,'±').replace(/\\cdot/g,'·')
+    .replace(/\\int/g,'∫').replace(/\\sum/g,'Σ').replace(/\\partial/g,'∂')
+    .replace(/\\[a-zA-Z]+/g,'');
 }
+
+
 
 const MATH_SNIPS=[
   {l:"√x",v:"\\sqrt{}"},{l:"x²",v:"^{2}"},{l:"x³",v:"^{3}"},{l:"xⁿ",v:"^{n}"},
@@ -864,8 +1017,8 @@ export default function NeetaraAdmin() {
                         style={{maxWidth:"100%",maxHeight:220,objectFit:"contain",borderRadius:6,border:`1px solid ${C.b}`}}/>
                     </div>
                   )}
-                  <div style={{fontSize:14,lineHeight:1.9,color:C.t,marginBottom:14,fontFamily:"serif"}}>
-                    {renderMath(form.question_text)}
+                  <div style={{fontSize:14,lineHeight:1.9,color:C.t,marginBottom:14}}>
+                    <MathText t={form.question_text} style={{fontSize:14,lineHeight:1.9,fontFamily:"serif"}}/>
                   </div>
                   <div style={{display:"flex",flexDirection:"column",gap:7}}>
                     {["A","B","C","D"].map(opt=>(
@@ -873,7 +1026,7 @@ export default function NeetaraAdmin() {
                         background:form.correct===opt?`${C.green}12`:C.card,border:`1px solid ${form.correct===opt?C.green:C.b}`}}>
                         <span style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,width:18}}>{opt}</span>
                         <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2,fontFamily:"serif"}}>
-                          {renderMath(form[`option_${opt.toLowerCase()}`])||<span style={{color:C.t4}}>—</span>}
+                          <MathText t={form[`option_${opt.toLowerCase()}`]||""}/>{!form[`option_${opt.toLowerCase()}`]&&<span style={{color:C.t4}}>—</span>}
                         </span>
                         {form.correct===opt&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
                       </div>
