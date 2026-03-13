@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// NEETARA — Question Bank Admin Panel
+// Connects to Supabase. Replace SUPABASE_URL and SUPABASE_ANON_KEY.
+// Admin users only — protected by RLS on the questions table.
+// ─────────────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL  = "https://tlmazdrnndylafhfxsrc.supabase.co";
 const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsbWF6ZHJubmR5bGFmaGZ4c3JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1ODEwNjAsImV4cCI6MjA4ODE1NzA2MH0.gGPknDEdaGfzDb2JJ2amEY9b33jlbTY3brvbbhvvIWg";
@@ -109,12 +114,80 @@ const wColor    = w => w==="H"?C.red:w==="M"?C.gold:C.t3;
 
 const BLANK_Q = {
   slug:"",subject:"Physics",topic:"Kinematics",subtopic:"",
-  exam:"JEE Main",year:2024,session:"",shift:"",
+  exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",
   question_text:"",option_a:"",option_b:"",option_c:"",option_d:"",correct:"A",
-  solution:"",concept:"",tip:"",
+  solution:"",concept:"",tip:"",diagram_url:"",
   difficulty:"Medium",weightage:"M",question_type:"MCQ",
   marks:4,negative:-1,has_image:false,is_verified:false,is_active:true,source_note:"",
 };
+
+// ── Math renderer: converts \sqrt{}, ^{2}, \tan^{-1}, Greek letters etc ─────
+// ── Math renderer ─────────────────────────────────────────────────────────────
+function renderMath(text) {
+  if (!text) return text;
+  return text
+    .replace(/\\frac\{([^}]+)\}\{([^}]+)\}/g,"($1)/($2)")
+    .replace(/\\sqrt\{([^}]+)\}/g,"√($1)")
+    .replace(/\\sqrt(?![{])/g,"√")
+    .replace(/\^\{([^}]+)\}/g,(_,p)=>{const m={"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","n":"ⁿ","x":"ˣ","-":"⁻","a":"ᵃ","b":"ᵇ","+":"⁺"};return p.split("").map(c=>m[c]||c).join("");})
+    .replace(/\^(\d)/g,(_,d)=>"⁰¹²³⁴⁵⁶⁷⁸⁹"[d])
+    .replace(/\_\{([^}]+)\}/g,(_,s)=>{const m={"0":"₀","1":"₁","2":"₂","3":"₃","4":"₄","5":"₅","6":"₆","7":"₇","8":"₈","9":"₉","n":"ₙ","x":"ₓ"};return s.split("").map(c=>m[c]||c).join("");})
+    .replace(/_(\d)/g,(_,d)=>"₀₁₂₃₄₅₆₇₈₉"[d])
+    .replace(/\\tan\^\{-1\}|\\arctan/g,"tan⁻¹").replace(/\\sin\^\{-1\}|\\arcsin/g,"sin⁻¹").replace(/\\cos\^\{-1\}|\\arccos/g,"cos⁻¹")
+    .replace(/\\tan(?![a-z])/g,"tan").replace(/\\sin(?![a-z])/g,"sin").replace(/\\cos(?![a-z])/g,"cos")
+    .replace(/\\alpha/g,"α").replace(/\\beta/g,"β").replace(/\\gamma/g,"γ").replace(/\\delta/g,"δ")
+    .replace(/\\Delta/g,"Δ").replace(/\\theta/g,"θ").replace(/\\phi/g,"φ").replace(/\\pi(?![a-z])/g,"π")
+    .replace(/\\omega/g,"ω").replace(/\\Omega/g,"Ω").replace(/\\mu(?![a-z])/g,"μ").replace(/\\lambda/g,"λ")
+    .replace(/\\sigma/g,"σ").replace(/\\epsilon/g,"ε").replace(/\\rho/g,"ρ")
+    .replace(/\\rightarrow|\\to(?![a-z])/g,"→").replace(/\\leftarrow/g,"←").replace(/\\Rightarrow/g,"⇒")
+    .replace(/\\times/g,"×").replace(/\\cdot/g,"·").replace(/\\div/g,"÷")
+    .replace(/\\leq/g,"≤").replace(/\\geq/g,"≥").replace(/\\neq/g,"≠").replace(/\\approx/g,"≈")
+    .replace(/\\infty/g,"∞").replace(/\\pm/g,"±").replace(/\\circ/g,"°").replace(/\\degree/g,"°")
+    .replace(/\\int(?![a-z])/g,"∫").replace(/\\sum/g,"Σ").replace(/\\partial/g,"∂")
+    .replace(/\\[a-zA-Z]+/g,"");
+}
+
+const MATH_SNIPS=[
+  {l:"√x",v:"\\sqrt{}"},{l:"x²",v:"^{2}"},{l:"x³",v:"^{3}"},{l:"xⁿ",v:"^{n}"},
+  {l:"x₁",v:"_{1}"},{l:"½",v:"\\frac{1}{2}"},{l:"a/b",v:"\\frac{}{}"},
+  {l:"tan⁻¹",v:"\\tan^{-1}"},{l:"sin⁻¹",v:"\\sin^{-1}"},{l:"cos⁻¹",v:"\\cos^{-1}"},
+  {l:"π",v:"\\pi"},{l:"θ",v:"\\theta"},{l:"α",v:"\\alpha"},{l:"β",v:"\\beta"},
+  {l:"Δ",v:"\\Delta"},{l:"ω",v:"\\omega"},{l:"λ",v:"\\lambda"},{l:"σ",v:"\\sigma"},
+  {l:"→",v:"\\to"},{l:"±",v:"\\pm"},{l:"≤",v:"\\leq"},{l:"≥",v:"\\geq"},
+  {l:"≠",v:"\\neq"},{l:"≈",v:"\\approx"},{l:"∞",v:"\\infty"},
+  {l:"∫",v:"\\int"},{l:"Σ",v:"\\sum"},{l:"°",v:"°"},{l:"×",v:"\\times"},
+];
+
+function MathToolbar({targetRef,value,onChange}) {
+  function insert(snip) {
+    const el=targetRef.current;
+    if(!el){onChange(value+snip);return;}
+    const s=el.selectionStart,e=el.selectionEnd;
+    const nv=value.slice(0,s)+snip+value.slice(e);
+    onChange(nv);
+    setTimeout(()=>{
+      const cur=snip.endsWith("{}")?s+snip.length-1:s+snip.length;
+      el.focus();el.setSelectionRange(cur,cur);
+    },0);
+  }
+  return(
+    <div style={{display:"flex",flexWrap:"wrap",gap:3,padding:"7px 10px",
+      background:"#111",borderRadius:"7px 7px 0 0",
+      border:`1px solid ${C.b}`,borderBottom:"none"}}>
+      {MATH_SNIPS.map(s=>(
+        <button key={s.l} onClick={()=>insert(s.v)}
+          style={{padding:"3px 7px",background:C.card,color:C.t,
+            border:`1px solid ${C.b}`,borderRadius:4,fontSize:12.5,
+            fontFamily:"serif",cursor:"pointer",lineHeight:1.4}}>
+          {s.l}
+        </button>
+      ))}
+      <span style={{fontSize:10,color:C.t4,alignSelf:"center",marginLeft:6}}>
+        click to insert · renders live in preview
+      </span>
+    </div>
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 export default function NeetaraAdmin() {
@@ -142,6 +215,13 @@ export default function NeetaraAdmin() {
   // Bulk import
   const [bulkJson,setBulkJson]=useState("");
   const [bulkResult,setBulkResult]=useState(null);
+
+  // Math input refs — used by MathToolbar to insert at cursor
+  const qTextRef = useRef(null);
+  const optARef  = useRef(null);
+  const optBRef  = useRef(null);
+  const optCRef  = useRef(null);
+  const optDRef  = useRef(null);
 
   function showToast(msg, type="success") {
     setToast({msg,type});
@@ -665,13 +745,42 @@ export default function NeetaraAdmin() {
             {/* ── Section: Question ── */}
             <Section title="Question">
               <Field label="Question text *">
-                <textarea rows={4} placeholder="Type the full question here. Use standard notation — x², √, →, etc." value={form.question_text} onChange={e=>setForm(f=>({...f,question_text:e.target.value}))}/>
+                <MathToolbar targetRef={qTextRef} value={form.question_text} onChange={v=>setForm(f=>({...f,question_text:v}))}/>
+                <textarea ref={qTextRef} rows={5}
+                  placeholder={"Type question here. Use math toolbar above or type directly:\n\\sqrt{2}, x^{2}, \\frac{a}{b}, \\tan^{-1}, \\pi, \\theta..."}
+                  value={form.question_text}
+                  onChange={e=>setForm(f=>({...f,question_text:e.target.value}))}
+                  style={{borderRadius:"0 0 7px 7px"}}/>
+              </Field>
+              <Field label="Diagram URL (optional)">
+                <input placeholder="https://xyz.supabase.co/storage/v1/object/public/diagrams/adv-2024-p1-ph-001.png"
+                  value={form.diagram_url||""}
+                  onChange={e=>setForm(f=>({...f,diagram_url:e.target.value}))}/>
+                {form.diagram_url&&(
+                  <div style={{marginTop:8,padding:10,background:C.hover,borderRadius:7,textAlign:"center"}}>
+                    <img src={form.diagram_url} alt="diagram" style={{maxWidth:"100%",maxHeight:220,objectFit:"contain",borderRadius:4}}
+                      onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+                    <div style={{display:"none",fontSize:11,color:C.red,marginTop:4}}>⚠ Image failed to load — check URL</div>
+                  </div>
+                )}
               </Field>
               <div className="g2">
-                <Field label="Option A *"><input value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))}/></Field>
-                <Field label="Option B *"><input value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))}/></Field>
-                <Field label="Option C *"><input value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))}/></Field>
-                <Field label="Option D *"><input value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))}/></Field>
+                <Field label="Option A *">
+                  <MathToolbar targetRef={optARef} value={form.option_a} onChange={v=>setForm(f=>({...f,option_a:v}))}/>
+                  <input ref={optARef} value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                </Field>
+                <Field label="Option B *">
+                  <MathToolbar targetRef={optBRef} value={form.option_b} onChange={v=>setForm(f=>({...f,option_b:v}))}/>
+                  <input ref={optBRef} value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                </Field>
+                <Field label="Option C *">
+                  <MathToolbar targetRef={optCRef} value={form.option_c} onChange={v=>setForm(f=>({...f,option_c:v}))}/>
+                  <input ref={optCRef} value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                </Field>
+                <Field label="Option D *">
+                  <MathToolbar targetRef={optDRef} value={form.option_d} onChange={v=>setForm(f=>({...f,option_d:v}))}/>
+                  <input ref={optDRef} value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                </Field>
               </div>
               <Field label="Correct Answer *">
                 <div style={{display:"flex",gap:8}}>
@@ -747,18 +856,31 @@ export default function NeetaraAdmin() {
 
             {/* ── Preview ── */}
             {form.question_text&&(
-              <Section title="Preview">
+              <Section title="Preview — rendered">
                 <div style={{background:C.hover,borderRadius:10,padding:"16px 18px"}}>
-                  <div style={{fontSize:14,lineHeight:1.8,color:C.t,marginBottom:14}}>{form.question_text}</div>
+                  {form.diagram_url&&(
+                    <div style={{textAlign:"center",marginBottom:14}}>
+                      <img src={form.diagram_url} alt="diagram"
+                        style={{maxWidth:"100%",maxHeight:220,objectFit:"contain",borderRadius:6,border:`1px solid ${C.b}`}}/>
+                    </div>
+                  )}
+                  <div style={{fontSize:14,lineHeight:1.9,color:C.t,marginBottom:14,fontFamily:"serif"}}>
+                    {renderMath(form.question_text)}
+                  </div>
                   <div style={{display:"flex",flexDirection:"column",gap:7}}>
                     {["A","B","C","D"].map(opt=>(
                       <div key={opt} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:8,
                         background:form.correct===opt?`${C.green}12`:C.card,border:`1px solid ${form.correct===opt?C.green:C.b}`}}>
                         <span style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,width:18}}>{opt}</span>
-                        <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2}}>{form[`option_${opt.toLowerCase()}`]||<span style={{color:C.t4}}>—</span>}</span>
+                        <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2,fontFamily:"serif"}}>
+                          {renderMath(form[`option_${opt.toLowerCase()}`])||<span style={{color:C.t4}}>—</span>}
+                        </span>
                         {form.correct===opt&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
                       </div>
                     ))}
+                  </div>
+                  <div style={{marginTop:10,fontSize:10,color:C.t4}}>
+                    raw: <span style={{fontFamily:"monospace",color:C.t3}}>{form.question_text.slice(0,80)}{form.question_text.length>80?"…":""}</span>
                   </div>
                 </div>
               </Section>
