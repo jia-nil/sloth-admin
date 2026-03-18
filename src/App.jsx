@@ -94,7 +94,7 @@ const BLANK_Q = {
   slug:"",subject:"Physics",topic:"Kinematics",subtopic:"",
   exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",
   question_text:"",option_a:"",option_b:"",option_c:"",option_d:"",correct:"A",
-  solution:"",concept:"",tip:"",diagram_url:"",
+  solution:"",concept:"",tip:"",diagram_url:"",answer_type:"text",
   difficulty:"Medium",weightage:"M",question_type:"MCQ",
   marks:4,negative:-1,has_image:false,is_verified:false,is_active:true,source_note:"",
 };
@@ -155,7 +155,7 @@ function parseMath(raw) {
         tau:'τ',nu:'ν',kappa:'κ',
         tan:'tan',sin:'sin',cos:'cos',log:'log',ln:'ln',
         arctan:'tan⁻¹',arcsin:'sin⁻¹',arccos:'cos⁻¹',
-        rightarrow:'→',leftarrow:'←',to:'→',Rightarrow:'⇒',leftrightarrow:'↔',
+        rightarrow:'→',leftarrow:'←',to:'→',Rightarrow:'⇒',leftrightarrow:'↔',rightleftharpoons:'⇌',
         times:'×',cdot:'·',div:'÷',leq:'≤',geq:'≥',neq:'≠',
         approx:'≈',infty:'∞',pm:'±',mp:'∓',circ:'°',degree:'°',
         int:'∫',sum:'Σ',prod:'Π',partial:'∂',nabla:'∇',
@@ -269,7 +269,7 @@ function renderMath(text) {
     .replace(/\\Delta/g,'Δ').replace(/\\theta/g,'θ').replace(/\\phi/g,'φ').replace(/\\pi/g,'π')
     .replace(/\\omega/g,'ω').replace(/\\Omega/g,'Ω').replace(/\\mu/g,'μ').replace(/\\lambda/g,'λ')
     .replace(/\\sigma/g,'σ').replace(/\\epsilon/g,'ε').replace(/\\rho/g,'ρ')
-    .replace(/\\to(?![a-z])/g,'→').replace(/\\rightarrow/g,'→').replace(/\\times/g,'×')
+    .replace(/\\to(?![a-z])/g,'→').replace(/\\rightarrow/g,'→').replace(/\\rightleftharpoons/g,'⇌').replace(/\\times/g,'×')
     .replace(/\\leq/g,'≤').replace(/\\geq/g,'≥').replace(/\\neq/g,'≠').replace(/\\approx/g,'≈')
     .replace(/\\infty/g,'∞').replace(/\\pm/g,'±').replace(/\\cdot/g,'·')
     .replace(/\\int/g,'∫').replace(/\\sum/g,'Σ').replace(/\\partial/g,'∂')
@@ -287,6 +287,14 @@ const MATH_SNIPS=[
   {l:"→",v:"\\to"},{l:"±",v:"\\pm"},{l:"≤",v:"\\leq"},{l:"≥",v:"\\geq"},
   {l:"≠",v:"\\neq"},{l:"≈",v:"\\approx"},{l:"∞",v:"\\infty"},
   {l:"∫",v:"\\int"},{l:"Σ",v:"\\sum"},{l:"°",v:"°"},{l:"×",v:"\\times"},
+,
+  // Chemistry — ion charges
+  {l:"⁺",v:"^{+}"},{l:"⁻",v:"^{-}"},{l:"²⁺",v:"^{2+}"},{l:"³⁺",v:"^{3+}"},
+  {l:"²⁻",v:"^{2-}"},{l:"³⁻",v:"^{3-}"},
+  // Atom notation: ^{mass}_{atomic_no}Symbol  e.g. ^{23}_{11}Na
+  {l:"ᴬ↑Z↓X",v:"^{A}_{Z}X"},{l:"H₂O",v:"H_{2}O"},{l:"CO₂",v:"CO_{2}"},
+  {l:"SO₄²⁻",v:"SO_{4}^{2-}"},{l:"NH₄⁺",v:"NH_{4}^{+}"},
+  {l:"⇌",v:"\\rightleftharpoons"},{l:"Å",v:"Å"}
 ];
 
 function MathToolbar({targetRef,value,onChange}) {
@@ -775,7 +783,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-          
+            )}
           </div>
         )}
 
@@ -861,24 +869,69 @@ export default function NeetaraAdmin() {
                   </div>
                 )}
               </Field>
-              <div className="g2">
-                <Field label="Option A *">
-                  <MathToolbar targetRef={optARef} value={form.option_a} onChange={v=>setForm(f=>({...f,option_a:v}))}/>
-                  <input ref={optARef} value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                </Field>
-                <Field label="Option B *">
-                  <MathToolbar targetRef={optBRef} value={form.option_b} onChange={v=>setForm(f=>({...f,option_b:v}))}/>
-                  <input ref={optBRef} value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                </Field>
-                <Field label="Option C *">
-                  <MathToolbar targetRef={optCRef} value={form.option_c} onChange={v=>setForm(f=>({...f,option_c:v}))}/>
-                  <input ref={optCRef} value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                </Field>
-                <Field label="Option D *">
-                  <MathToolbar targetRef={optDRef} value={form.option_d} onChange={v=>setForm(f=>({...f,option_d:v}))}/>
-                  <input ref={optDRef} value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                </Field>
+              {/* Answer type toggle */}
+              <div style={{marginBottom:14}}>
+                <label>Answer Type</label>
+                <div style={{display:"flex",gap:8}}>
+                  {[{v:"text",l:"Text / Math"},{v:"image",l:"Diagram Images"}].map(t=>(
+                    <button key={t.v} onClick={()=>setForm(f=>({...f,answer_type:t.v}))}
+                      style={{padding:"7px 16px",borderRadius:7,fontSize:12,fontWeight:form.answer_type===t.v?700:400,
+                        background:form.answer_type===t.v?`${C.blue}22`:C.hover,
+                        color:form.answer_type===t.v?C.blue:C.t3,
+                        border:`1.5px solid ${form.answer_type===t.v?C.blue:C.b}`}}>
+                      {t.l}
+                    </button>
+                  ))}
+                </div>
+                {form.answer_type==="image"&&(
+                  <div style={{fontSize:11,color:C.t3,marginTop:6}}>
+                    Upload each option diagram to Supabase Storage and paste the URL. Leave blank to skip.
+                  </div>
+                )}
               </div>
+
+              {form.answer_type==="image"?(
+                /* ── Image options ── */
+                <div className="g2">
+                  {["a","b","c","d"].map((opt,i)=>(
+                    <Field key={opt} label={`Option ${opt.toUpperCase()} — Image URL *`}>
+                      <input
+                        value={form[`option_${opt}`]}
+                        onChange={e=>setForm(f=>({...f,[`option_${opt}`]:e.target.value}))}
+                        placeholder={`https://...supabase.co/.../option-${opt}.png`}/>
+                      {form[`option_${opt}`]&&(
+                        <div style={{marginTop:6,textAlign:"center",padding:8,background:C.hover,borderRadius:6}}>
+                          <img src={form[`option_${opt}`]} alt={`Option ${opt.toUpperCase()}`}
+                            style={{maxWidth:"100%",maxHeight:120,objectFit:"contain",borderRadius:4}}
+                            onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+                          <div style={{display:"none",fontSize:10,color:C.red}}>⚠ image failed</div>
+                        </div>
+                      )}
+                    </Field>
+                  ))}
+                </div>
+              ):(
+                /* ── Text / Math options ── */
+                <div className="g2">
+                  <Field label="Option A *">
+                    <MathToolbar targetRef={optARef} value={form.option_a} onChange={v=>setForm(f=>({...f,option_a:v}))}/>
+                    <input ref={optARef} value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                  </Field>
+                  <Field label="Option B *">
+                    <MathToolbar targetRef={optBRef} value={form.option_b} onChange={v=>setForm(f=>({...f,option_b:v}))}/>
+                    <input ref={optBRef} value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                  </Field>
+                  <Field label="Option C *">
+                    <MathToolbar targetRef={optCRef} value={form.option_c} onChange={v=>setForm(f=>({...f,option_c:v}))}/>
+                    <input ref={optCRef} value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                  </Field>
+                  <Field label="Option D *">
+                    <MathToolbar targetRef={optDRef} value={form.option_d} onChange={v=>setForm(f=>({...f,option_d:v}))}/>
+                    <input ref={optDRef} value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                  </Field>
+                </div>
+              )}
+
               <Field label="Correct Answer *">
                 <div style={{display:"flex",gap:8}}>
                   {["A","B","C","D"].map(opt=>(
@@ -964,18 +1017,39 @@ export default function NeetaraAdmin() {
                   <div style={{fontSize:14,lineHeight:1.9,color:C.t,marginBottom:14}}>
                     <MathText t={form.question_text} style={{fontSize:14,lineHeight:1.9,fontFamily:"serif"}}/>
                   </div>
-                  <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                    {["A","B","C","D"].map(opt=>(
-                      <div key={opt} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:8,
-                        background:form.correct===opt?`${C.green}12`:C.card,border:`1px solid ${form.correct===opt?C.green:C.b}`}}>
-                        <span style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,width:18}}>{opt}</span>
-                        <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2,fontFamily:"serif"}}>
-                          <MathText t={form[`option_${opt.toLowerCase()}`]||""}/>{!form[`option_${opt.toLowerCase()}`]&&<span style={{color:C.t4}}>—</span>}
-                        </span>
-                        {form.correct===opt&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
-                      </div>
-                    ))}
-                  </div>
+                  {form.answer_type==="image"?(
+                    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                      {["A","B","C","D"].map(opt=>{
+                        const url=form[`option_${opt.toLowerCase()}`];
+                        return(
+                          <div key={opt} style={{borderRadius:8,padding:"10px",
+                            background:form.correct===opt?`${C.green}12`:C.card,
+                            border:`1.5px solid ${form.correct===opt?C.green:C.b}`}}>
+                            <div style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,marginBottom:6,fontSize:12}}>
+                              {opt}{form.correct===opt?" ✓":""}
+                            </div>
+                            {url
+                              ?<img src={url} alt={`Option ${opt}`} style={{width:"100%",maxHeight:100,objectFit:"contain",borderRadius:4}}/>
+                              :<div style={{fontSize:11,color:C.t4,textAlign:"center",padding:"16px 0"}}>no image</div>
+                            }
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ):(
+                    <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                      {["A","B","C","D"].map(opt=>(
+                        <div key={opt} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:8,
+                          background:form.correct===opt?`${C.green}12`:C.card,border:`1px solid ${form.correct===opt?C.green:C.b}`}}>
+                          <span style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,width:18}}>{opt}</span>
+                          <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2,fontFamily:"serif"}}>
+                            <MathText t={form[`option_${opt.toLowerCase()}`]||""}/>{!form[`option_${opt.toLowerCase()}`]&&<span style={{color:C.t4}}>—</span>}
+                          </span>
+                          {form.correct===opt&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   <div style={{marginTop:10,fontSize:10,color:C.t4}}>
                     raw: <span style={{fontFamily:"monospace",color:C.t3}}>{form.question_text.slice(0,80)}{form.question_text.length>80?"…":""}</span>
                   </div>
