@@ -6,8 +6,8 @@ import { useState, useEffect, useRef } from "react";
 // Admin users only — protected by RLS on the questions table.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SUPABASE_URL  = "https://YOUR_PROJECT.supabase.co";
-const SUPABASE_KEY  = "YOUR_ANON_KEY";
+const SUPABASE_URL  = "https://tlmazdrnndylafhfxsrc.supabase.co";
+const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsbWF6ZHJubmR5bGFmaGZ4c3JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1ODEwNjAsImV4cCI6MjA4ODE1NzA2MH0.gGPknDEdaGfzDb2JJ2amEY9b33jlbTY3brvbbhvvIWg";
 
 const SUBJECTS = ["Physics","Chemistry","Mathematics"];
 const TOPICS = {
