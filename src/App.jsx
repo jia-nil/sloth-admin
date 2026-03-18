@@ -75,29 +75,7 @@ const sb = {
   },
 };
 
-// ── Demo mode (no Supabase) — uses in-memory data ──────────────────────────
-const DEMO_QUESTIONS = [
-  {id:"1",slug:"P001",subject:"Physics",topic:"Kinematics",exam:"JEE Main",year:2023,
-   difficulty:"Medium",weightage:"H",is_verified:true,is_active:true,
-   question_text:"A particle's position x = 3t³ − 2t² + t − 5. Acceleration at t=2s?",
-   option_a:"18 m/s²",option_b:"28 m/s²",option_c:"32 m/s²",option_d:"36 m/s²",correct:"C",
-   solution:"a = d²x/dt² = 18t − 4. At t=2: a = 32 m/s²",
-   concept:"Differentiation",tip:"Differentiate position twice.",created_at:new Date().toISOString()},
-  {id:"2",slug:"C001",subject:"Chemistry",topic:"Mole Concept",exam:"JEE Main",year:2023,
-   difficulty:"Easy",weightage:"H",is_verified:true,is_active:true,
-   question_text:"Moles of CO₂ from complete combustion of 1 mol C₃H₈?",
-   option_a:"2",option_b:"3",option_c:"4",option_d:"5",correct:"B",
-   solution:"C₃H₈ + 5O₂ → 3CO₂ + 4H₂O. Answer: 3 moles.",
-   concept:"Stoichiometry",tip:"Balance equation first.",created_at:new Date().toISOString()},
-  {id:"3",slug:"M001",subject:"Mathematics",topic:"Integrals",exam:"JEE Main",year:2023,
-   difficulty:"Medium",weightage:"H",is_verified:false,is_active:true,
-   question_text:"∫₀^(π/2) sin²x dx = ?",
-   option_a:"π/4",option_b:"π/2",option_c:"π/8",option_d:"1",correct:"A",
-   solution:"Use sin²x = (1−cos2x)/2. Result: π/4.",
-   concept:"Half-angle integration",tip:"Memorise ∫sin²x dx = x/2 − sin2x/4.",created_at:new Date().toISOString()},
-];
 
-const DEMO_MODE = SUPABASE_URL.includes("YOUR_PROJECT");
 
 // ── Color palette ──────────────────────────────────────────────────────────
 const C = {
@@ -385,7 +363,6 @@ export default function NeetaraAdmin() {
   async function loadQs() {
     setLoading(true);
     try {
-      if (DEMO_MODE) { setQs(DEMO_QUESTIONS); setLoading(false); return; }
       const filter = {};
       if (fSub  !== "All") filter["subject=eq."]  = fSub;
       if (fTopic!== "All") filter["topic=eq."]    = fTopic;
@@ -405,16 +382,6 @@ export default function NeetaraAdmin() {
   }
 
   async function loadStats() {
-    if (DEMO_MODE) {
-      setStats({
-        total: DEMO_QUESTIONS.length,
-        verified: DEMO_QUESTIONS.filter(q=>q.is_verified).length,
-        bySubject: {Physics:1,Chemistry:1,Mathematics:1},
-        byYear: {2023:3},
-        byDifficulty: {Easy:1,Medium:2,Hard:0},
-      });
-      return;
-    }
     try {
       const all = await sb.query("questions", { select:"subject,year,difficulty,is_verified,is_active", filter:{"is_active=eq.":"true"} });
       const s = { total:all.length, verified:all.filter(q=>q.is_verified).length,
@@ -438,17 +405,6 @@ export default function NeetaraAdmin() {
     if (missing.length) { showToast("Fill in: "+missing.join(", "),"error"); return; }
     setSaving(true);
     try {
-      if (DEMO_MODE) {
-        if (editQ) {
-          setQs(prev=>prev.map(q=>q.id===editQ.id?{...q,...form}:q));
-          showToast("Updated (demo mode)");
-        } else {
-          setQs(prev=>[{...form,id:String(Date.now()),created_at:new Date().toISOString()},...prev]);
-          showToast("Added (demo mode)");
-        }
-        setView("questions");
-        return;
-      }
       if (editQ) {
         await sb.update("questions", editQ.id, form);
         showToast("Question updated ✓");
@@ -466,11 +422,6 @@ export default function NeetaraAdmin() {
   }
 
   async function toggleVerify(q) {
-    if (DEMO_MODE) {
-      setQs(prev=>prev.map(x=>x.id===q.id?{...x,is_verified:!x.is_verified}:x));
-      showToast((!q.is_verified?"Verified":"Unverified")+" (demo)");
-      return;
-    }
     try {
       await sb.update("questions", q.id, {is_verified:!q.is_verified});
       setQs(prev=>prev.map(x=>x.id===q.id?{...x,is_verified:!x.is_verified}:x));
@@ -480,10 +431,6 @@ export default function NeetaraAdmin() {
   }
 
   async function toggleActive(q) {
-    if (DEMO_MODE) {
-      setQs(prev=>prev.map(x=>x.id===q.id?{...x,is_active:!x.is_active}:x));
-      return;
-    }
     try {
       await sb.update("questions", q.id, {is_active:!q.is_active});
       setQs(prev=>prev.map(x=>x.id===q.id?{...x,is_active:!x.is_active}:x));
@@ -514,8 +461,7 @@ export default function NeetaraAdmin() {
     const results = {ok:0, fail:0, errors:[]};
     for (const q of parsed) {
       try {
-        if (DEMO_MODE) { setQs(prev=>[...prev,{...q,id:String(Date.now()+Math.random()),created_at:new Date().toISOString()}]); results.ok++; }
-        else { await sb.insert("questions", q); results.ok++; }
+        await sb.insert("questions", q); results.ok++;
       } catch(e) { results.fail++; results.errors.push(q.slug||"?"+": "+e.message); }
     }
     setBulkResult(results);
@@ -565,7 +511,6 @@ export default function NeetaraAdmin() {
         <div style={{padding:"0 20px 24px",borderBottom:`1px solid ${C.b}`}}>
           <div style={{fontSize:17,fontWeight:700,letterSpacing:"-.02em",color:C.t}}>Neetara</div>
           <div style={{fontSize:11,color:C.t3,marginTop:2}}>Admin Panel</div>
-          {DEMO_MODE&&<div style={{marginTop:8,padding:"4px 8px",background:`${C.gold}18`,border:`1px solid ${C.gold}30`,borderRadius:6,fontSize:10,color:C.gold}}>⚠ Demo mode</div>}
         </div>
         <nav style={{padding:"12px 10px",flex:1}}>
           {[
@@ -819,8 +764,7 @@ export default function NeetaraAdmin() {
             )}
 
             {/* Pagination */}
-            {!DEMO_MODE&&(
-              <div style={{display:"flex",gap:8,marginTop:16,alignItems:"center"}}>
+            <div style={{display:"flex",gap:8,marginTop:16,alignItems:"center"}}>
                 <button disabled={page===0} onClick={()=>setPage(p=>p-1)}
                   style={{padding:"7px 14px",background:C.card,color:page===0?C.t4:C.t,border:`1px solid ${C.b}`,borderRadius:7,fontSize:12,opacity:page===0?.4:1}}>
                   ← Prev
