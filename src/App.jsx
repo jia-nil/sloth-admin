@@ -94,7 +94,7 @@ const BLANK_Q = {
   slug:"",subject:"Physics",topic:"Kinematics",subtopic:"",
   exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",
   question_text:"",option_a:"",option_b:"",option_c:"",option_d:"",correct:"A",
-  solution:"",concept:"",tip:"",diagram_url:"",answer_type:"text",
+  solution:"",concept:"",tip:"",diagram_url:"",solution_diagram_url:"",answer_type:"text",
   difficulty:"Medium",weightage:"M",question_type:"MCQ",
   marks:4,negative:-1,has_image:false,is_verified:false,is_active:true,source_note:"",
 };
@@ -361,6 +361,7 @@ export default function NeetaraAdmin() {
   const optBRef  = useRef(null);
   const optCRef  = useRef(null);
   const optDRef  = useRef(null);
+  const solRef   = useRef(null);
 
   function showToast(msg, type="success") {
     setToast({msg,type});
@@ -783,7 +784,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-        
+            )}
           </div>
         )}
 
@@ -950,7 +951,37 @@ export default function NeetaraAdmin() {
             {/* ── Section: Solution ── */}
             <Section title="Solution">
               <Field label="Step-by-step solution *">
-                <textarea rows={5} placeholder={"Line 1: Setup\nLine 2: Substitute\nLine 3: Solve\n..."} value={form.solution} onChange={e=>setForm(f=>({...f,solution:e.target.value}))}/>
+                <MathToolbar targetRef={solRef} value={form.solution} onChange={v=>setForm(f=>({...f,solution:v}))}/>
+                <textarea ref={solRef} rows={7}
+                  placeholder={"Write solution step by step.\nUse math: x^{3}, \\frac{a}{b}, \\sqrt{2}, \\alpha, Fe^{3+}, ^{56}_{26}Fe\n\nLine 1: Setup\nLine 2: Substitute\nLine 3: Solve"}
+                  value={form.solution}
+                  onChange={e=>setForm(f=>({...f,solution:e.target.value}))}
+                  style={{borderRadius:"0 0 7px 7px",minHeight:140}}/>
+              </Field>
+              {/* Solution preview */}
+              {form.solution&&(
+                <div style={{background:C.hover,borderRadius:8,padding:"12px 14px",marginBottom:14}}>
+                  <div style={{fontSize:10,color:C.t4,marginBottom:8,letterSpacing:".06em",textTransform:"uppercase"}}>Solution preview</div>
+                  <div style={{fontSize:13,lineHeight:2,color:C.t,whiteSpace:"pre-wrap",fontFamily:"serif"}}>
+                    {form.solution.split("\n").map((line,i)=>(
+                      <div key={i}><MathText t={line}/></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Field label="Solution diagram URL (optional)">
+                <input
+                  placeholder="https://...supabase.co/.../solution-diagram.png"
+                  value={form.solution_diagram_url||""}
+                  onChange={e=>setForm(f=>({...f,solution_diagram_url:e.target.value}))}/>
+                {form.solution_diagram_url&&(
+                  <div style={{marginTop:8,padding:10,background:C.hover,borderRadius:7,textAlign:"center"}}>
+                    <img src={form.solution_diagram_url} alt="solution diagram"
+                      style={{maxWidth:"100%",maxHeight:260,objectFit:"contain",borderRadius:4}}
+                      onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+                    <div style={{display:"none",fontSize:11,color:C.red,marginTop:4}}>⚠ Image failed to load — check URL</div>
+                  </div>
+                )}
               </Field>
               <div className="g2">
                 <Field label="Key concept">
