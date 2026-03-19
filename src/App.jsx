@@ -94,8 +94,8 @@ const BLANK_Q = {
   slug:"",subject:"Physics",topic:"Kinematics",subtopic:"",
   exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",
   question_text:"",option_a:"",option_b:"",option_c:"",option_d:"",correct:"A",
-  solution:"",concept:"",tip:"",diagram_url:"",solution_diagram_url:"",answer_type:"text",
-  difficulty:"Medium",weightage:"M",question_type:"MCQ",
+  solution:"",concept:"",tip:"",diagram_url:"",solution_diagram_url:"",answer_type:"text",partial_marks:null,
+  difficulty:"Medium",weightage:"M",question_type:"SCQ",
   marks:4,negative:-1,has_image:false,is_verified:false,is_active:true,source_note:"",
 };
 
@@ -409,7 +409,10 @@ export default function NeetaraAdmin() {
 
   // ── Save question ─────────────────────────────────────────────────────────
   async function saveQ() {
-    const required = ["subject","topic","question_text","option_a","option_b","option_c","option_d","correct","solution"];
+    const isNumerical = form.question_type==="Integer"||form.question_type==="Decimal";
+    const required = isNumerical
+      ? ["subject","topic","question_text","correct","solution"]
+      : ["subject","topic","question_text","option_a","option_b","option_c","option_d","correct","solution"];
     const missing  = required.filter(k=>!form[k]?.toString().trim());
     if (missing.length) { showToast("Fill in: "+missing.join(", "),"error"); return; }
     setSaving(true);
@@ -784,7 +787,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-           
+            )}
           </div>
         )}
 
@@ -836,11 +839,11 @@ export default function NeetaraAdmin() {
                     {YEARS.map(y=><option key={y}>{y}</option>)}
                   </select>
                 </Field>
-                <Field label="Session">
-                  <input placeholder="Jan S1, Apr S2…" value={form.session||""} onChange={e=>setForm(f=>({...f,session:e.target.value}))}/>
+                <Field label="Session (leave blank for JEE Advanced)">
+                  <input placeholder="leave blank for JEE Advanced" value={form.session||""} onChange={e=>setForm(f=>({...f,session:e.target.value}))}/>
                 </Field>
-                <Field label="Shift">
-                  <input placeholder="Morning / Evening" value={form.shift||""} onChange={e=>setForm(f=>({...f,shift:e.target.value}))}/>
+                <Field label="Paper (Morning = P1, Evening = P2)">
+                  <input placeholder="Morning (P1) / Evening (P2)" value={form.shift||""} onChange={e=>setForm(f=>({...f,shift:e.target.value}))}/>
                 </Field>
               </div>
               <Field label="Source Note">
@@ -870,81 +873,189 @@ export default function NeetaraAdmin() {
                   </div>
                 )}
               </Field>
-              {/* Answer type toggle */}
-              <div style={{marginBottom:14}}>
-                <label>Answer Type</label>
-                <div style={{display:"flex",gap:8}}>
-                  {[{v:"text",l:"Text / Math"},{v:"image",l:"Diagram Images"}].map(t=>(
-                    <button key={t.v} onClick={()=>setForm(f=>({...f,answer_type:t.v}))}
-                      style={{padding:"7px 16px",borderRadius:7,fontSize:12,fontWeight:form.answer_type===t.v?700:400,
-                        background:form.answer_type===t.v?`${C.blue}22`:C.hover,
-                        color:form.answer_type===t.v?C.blue:C.t3,
-                        border:`1.5px solid ${form.answer_type===t.v?C.blue:C.b}`}}>
+              {/* ── Question Type selector ── */}
+              <div style={{marginBottom:16}}>
+                <label>Question Type *</label>
+                <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                  {[
+                    {v:"SCQ", l:"Single Correct",  hint:"+3 / −1"},
+                    {v:"MSQ", l:"Multiple Correct", hint:"+4 / −2"},
+                    {v:"Integer", l:"Integer",      hint:"+4 / 0"},
+                    {v:"Decimal", l:"Decimal",      hint:"+4 / 0"},
+                  ].map(t=>(
+                    <button key={t.v}
+                      onClick={()=>setForm(f=>({...f,question_type:t.v,correct:"",
+                        // clear options for numerical types
+                        ...(t.v==="Integer"||t.v==="Decimal"?{option_a:"",option_b:"",option_c:"",option_d:""}:{})
+                      }))}
+                      style={{padding:"8px 14px",borderRadius:7,fontSize:12,
+                        fontWeight:form.question_type===t.v?700:400,
+                        background:form.question_type===t.v?`${C.gold}22`:C.hover,
+                        color:form.question_type===t.v?C.gold:C.t3,
+                        border:`1.5px solid ${form.question_type===t.v?C.gold:C.b}`}}>
                       {t.l}
+                      <span style={{fontSize:10,marginLeft:6,opacity:.7}}>{t.hint}</span>
                     </button>
                   ))}
                 </div>
-                {form.answer_type==="image"&&(
-                  <div style={{fontSize:11,color:C.t3,marginTop:6}}>
-                    Upload each option diagram to Supabase Storage and paste the URL. Leave blank to skip.
-                  </div>
-                )}
               </div>
 
-              {form.answer_type==="image"?(
-                /* ── Image options ── */
-                <div className="g2">
-                  {["a","b","c","d"].map((opt,i)=>(
-                    <Field key={opt} label={`Option ${opt.toUpperCase()} — Image URL *`}>
-                      <input
-                        value={form[`option_${opt}`]}
-                        onChange={e=>setForm(f=>({...f,[`option_${opt}`]:e.target.value}))}
-                        placeholder={`https://...supabase.co/.../option-${opt}.png`}/>
-                      {form[`option_${opt}`]&&(
-                        <div style={{marginTop:6,textAlign:"center",padding:8,background:C.hover,borderRadius:6}}>
-                          <img src={form[`option_${opt}`]} alt={`Option ${opt.toUpperCase()}`}
-                            style={{maxWidth:"100%",maxHeight:120,objectFit:"contain",borderRadius:4}}
-                            onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
-                          <div style={{display:"none",fontSize:10,color:C.red}}>⚠ image failed</div>
-                        </div>
-                      )}
-                    </Field>
-                  ))}
-                </div>
-              ):(
-                /* ── Text / Math options ── */
-                <div className="g2">
-                  <Field label="Option A *">
-                    <MathToolbar targetRef={optARef} value={form.option_a} onChange={v=>setForm(f=>({...f,option_a:v}))}/>
-                    <input ref={optARef} value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                  </Field>
-                  <Field label="Option B *">
-                    <MathToolbar targetRef={optBRef} value={form.option_b} onChange={v=>setForm(f=>({...f,option_b:v}))}/>
-                    <input ref={optBRef} value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                  </Field>
-                  <Field label="Option C *">
-                    <MathToolbar targetRef={optCRef} value={form.option_c} onChange={v=>setForm(f=>({...f,option_c:v}))}/>
-                    <input ref={optCRef} value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                  </Field>
-                  <Field label="Option D *">
-                    <MathToolbar targetRef={optDRef} value={form.option_d} onChange={v=>setForm(f=>({...f,option_d:v}))}/>
-                    <input ref={optDRef} value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
-                  </Field>
+              {/* ── Answer Type (text vs image options) — only for MCQ types ── */}
+              {(form.question_type==="SCQ"||form.question_type==="MSQ")&&(
+                <div style={{marginBottom:14}}>
+                  <label>Option Format</label>
+                  <div style={{display:"flex",gap:8}}>
+                    {[{v:"text",l:"Text / Math"},{v:"image",l:"Diagram Images"}].map(t=>(
+                      <button key={t.v} onClick={()=>setForm(f=>({...f,answer_type:t.v}))}
+                        style={{padding:"7px 16px",borderRadius:7,fontSize:12,fontWeight:form.answer_type===t.v?700:400,
+                          background:form.answer_type===t.v?`${C.blue}22`:C.hover,
+                          color:form.answer_type===t.v?C.blue:C.t3,
+                          border:`1.5px solid ${form.answer_type===t.v?C.blue:C.b}`}}>
+                        {t.l}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 
+              {/* ── Options (hidden for Integer/Decimal) ── */}
+              {(form.question_type==="SCQ"||form.question_type==="MSQ")&&(
+                form.answer_type==="image"?(
+                  <div className="g2">
+                    {["a","b","c","d"].map(opt=>(
+                      <Field key={opt} label={`Option ${opt.toUpperCase()} — Image URL *`}>
+                        <input value={form[`option_${opt}`]}
+                          onChange={e=>setForm(f=>({...f,[`option_${opt}`]:e.target.value}))}
+                          placeholder={`https://...supabase.co/.../option-${opt}.png`}/>
+                        {form[`option_${opt}`]&&(
+                          <div style={{marginTop:6,textAlign:"center",padding:8,background:C.hover,borderRadius:6}}>
+                            <img src={form[`option_${opt}`]} alt={`Option ${opt.toUpperCase()}`}
+                              style={{maxWidth:"100%",maxHeight:120,objectFit:"contain",borderRadius:4}}
+                              onError={e=>{e.target.style.display="none";e.target.nextSibling.style.display="block";}}/>
+                            <div style={{display:"none",fontSize:10,color:C.red}}>⚠ image failed</div>
+                          </div>
+                        )}
+                      </Field>
+                    ))}
+                  </div>
+                ):(
+                  <div className="g2">
+                    <Field label="Option A *">
+                      <MathToolbar targetRef={optARef} value={form.option_a} onChange={v=>setForm(f=>({...f,option_a:v}))}/>
+                      <input ref={optARef} value={form.option_a} onChange={e=>setForm(f=>({...f,option_a:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                    </Field>
+                    <Field label="Option B *">
+                      <MathToolbar targetRef={optBRef} value={form.option_b} onChange={v=>setForm(f=>({...f,option_b:v}))}/>
+                      <input ref={optBRef} value={form.option_b} onChange={e=>setForm(f=>({...f,option_b:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                    </Field>
+                    <Field label="Option C *">
+                      <MathToolbar targetRef={optCRef} value={form.option_c} onChange={v=>setForm(f=>({...f,option_c:v}))}/>
+                      <input ref={optCRef} value={form.option_c} onChange={e=>setForm(f=>({...f,option_c:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                    </Field>
+                    <Field label="Option D *">
+                      <MathToolbar targetRef={optDRef} value={form.option_d} onChange={v=>setForm(f=>({...f,option_d:v}))}/>
+                      <input ref={optDRef} value={form.option_d} onChange={e=>setForm(f=>({...f,option_d:e.target.value}))} style={{borderRadius:"0 0 7px 7px"}}/>
+                    </Field>
+                  </div>
+                )
+              )}
+
+              {/* ── Correct Answer — changes based on question type ── */}
               <Field label="Correct Answer *">
-                <div style={{display:"flex",gap:8}}>
-                  {["A","B","C","D"].map(opt=>(
-                    <button key={opt} onClick={()=>setForm(f=>({...f,correct:opt}))}
-                      style={{flex:1,padding:"10px",borderRadius:8,fontWeight:700,fontSize:14,
-                        background:form.correct===opt?`${C.green}22`:C.hover,
-                        color:form.correct===opt?C.green:C.t3,
-                        border:`1.5px solid ${form.correct===opt?C.green:C.b}`}}>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
+                {form.question_type==="Integer"?(
+                  <div>
+                    <input type="number" step="1"
+                      placeholder="Enter the integer answer (e.g. 7)"
+                      value={form.correct}
+                      onChange={e=>setForm(f=>({...f,correct:e.target.value}))}
+                      style={{fontFamily:"monospace",fontSize:15,fontWeight:700}}/>
+                    <div style={{fontSize:11,color:C.t3,marginTop:5}}>Integer only. +4 marks, no negative marking.</div>
+                  </div>
+                ):form.question_type==="Decimal"?(
+                  <div>
+                    <input type="number" step="0.01"
+                      placeholder="Enter decimal answer (e.g. 3.14)"
+                      value={form.correct}
+                      onChange={e=>setForm(f=>({...f,correct:e.target.value}))}
+                      style={{fontFamily:"monospace",fontSize:15,fontWeight:700}}/>
+                    <div style={{fontSize:11,color:C.t3,marginTop:5}}>Decimal. +4 marks, no negative marking.</div>
+                  </div>
+                ):form.question_type==="MSQ"?(
+                  <div>
+                    <div style={{display:"flex",gap:8,marginBottom:8}}>
+                      {["A","B","C","D"].map(opt=>{
+                        const selected=(form.correct||"").includes(opt);
+                        return(
+                          <button key={opt}
+                            onClick={()=>{
+                              const cur=(form.correct||"").split("").filter(Boolean);
+                              const next=selected?cur.filter(x=>x!==opt):[...cur,opt].sort();
+                              setForm(f=>({...f,correct:next.join("")}));
+                            }}
+                            style={{flex:1,padding:"10px",borderRadius:8,fontWeight:700,fontSize:14,
+                              background:selected?`${C.green}22`:C.hover,
+                              color:selected?C.green:C.t3,
+                              border:`2px solid ${selected?C.green:C.b}`}}>
+                            {opt}{selected?" ✓":""}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {form.correct&&<div style={{fontSize:12,color:C.green,fontWeight:700,marginBottom:12}}>Correct options: {form.correct}</div>}
+                    {/* Partial marks scheme */}
+                    {form.correct&&form.correct.length>0&&(()=>{
+                      const n=form.correct.length;
+                      const pm=form.partial_marks||{};
+                      return(
+                        <div style={{background:C.card,border:`1px solid ${C.b}`,borderRadius:8,padding:"12px 14px"}}>
+                          <div style={{fontSize:11,color:C.t3,marginBottom:10,letterSpacing:".05em",textTransform:"uppercase"}}>
+                            Partial marks scheme — if student selects exactly k correct options (no wrong ones)
+                          </div>
+                          <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                            {Array.from({length:n},(_,i)=>i+1).map(k=>(
+                              <div key={k} style={{display:"flex",alignItems:"center",gap:12}}>
+                                <span style={{fontSize:12,color:C.t2,width:180,flexShrink:0}}>
+                                  {k===n
+                                    ? `All ${n} correct selected`
+                                    : `${k} of ${n} correct selected`}
+                                </span>
+                                <input type="number" step="1" min="0" max="4"
+                                  value={pm[k]??( k===n?4:k )}
+                                  onChange={e=>setForm(f=>({...f,
+                                    partial_marks:{...(f.partial_marks||{}),[k]:parseInt(e.target.value)||0}
+                                  }))}
+                                  style={{width:60,fontFamily:"monospace",fontWeight:700,
+                                    fontSize:14,textAlign:"center",color:C.green}}/>
+                                <span style={{fontSize:11,color:C.t3}}>marks</span>
+                              </div>
+                            ))}
+                            <div style={{display:"flex",alignItems:"center",gap:12,borderTop:`1px solid ${C.b}`,paddingTop:8,marginTop:2}}>
+                              <span style={{fontSize:12,color:C.red,width:180,flexShrink:0}}>Any wrong option selected</span>
+                              <span style={{fontFamily:"monospace",fontWeight:700,fontSize:14,color:C.red}}>−2</span>
+                              <span style={{fontSize:11,color:C.t3}}>marks (fixed)</span>
+                            </div>
+                          </div>
+                          <div style={{fontSize:10,color:C.t4,marginTop:10}}>
+                            Default: 1 correct=1mk, 2=2mk… all correct=4mk. Edit if different.
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ):(
+                  /* SCQ */
+                  <div style={{display:"flex",gap:8}}>
+                    {["A","B","C","D"].map(opt=>(
+                      <button key={opt} onClick={()=>setForm(f=>({...f,correct:opt}))}
+                        style={{flex:1,padding:"10px",borderRadius:8,fontWeight:700,fontSize:14,
+                          background:form.correct===opt?`${C.green}22`:C.hover,
+                          color:form.correct===opt?C.green:C.t3,
+                          border:`1.5px solid ${form.correct===opt?C.green:C.b}`}}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </Field>
             </Section>
 
@@ -1048,16 +1159,26 @@ export default function NeetaraAdmin() {
                   <div style={{fontSize:14,lineHeight:1.9,color:C.t,marginBottom:14}}>
                     <MathText t={form.question_text} style={{fontSize:14,lineHeight:1.9,fontFamily:"serif"}}/>
                   </div>
-                  {form.answer_type==="image"?(
+                  {(form.question_type==="Integer"||form.question_type==="Decimal")?(
+                    <div style={{padding:"14px 16px",background:C.card,borderRadius:8,border:`1px solid ${C.b}`}}>
+                      <div style={{fontSize:11,color:C.t3,marginBottom:6,textTransform:"uppercase",letterSpacing:".06em"}}>
+                        {form.question_type} answer
+                      </div>
+                      <div style={{fontSize:22,fontWeight:700,color:C.green,fontFamily:"monospace"}}>
+                        {form.correct||<span style={{color:C.t4,fontSize:14}}>not set</span>}
+                      </div>
+                    </div>
+                  ):form.answer_type==="image"?(
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                       {["A","B","C","D"].map(opt=>{
                         const url=form[`option_${opt.toLowerCase()}`];
+                        const isCorrect=(form.correct||"").includes(opt);
                         return(
                           <div key={opt} style={{borderRadius:8,padding:"10px",
-                            background:form.correct===opt?`${C.green}12`:C.card,
-                            border:`1.5px solid ${form.correct===opt?C.green:C.b}`}}>
-                            <div style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,marginBottom:6,fontSize:12}}>
-                              {opt}{form.correct===opt?" ✓":""}
+                            background:isCorrect?`${C.green}12`:C.card,
+                            border:`1.5px solid ${isCorrect?C.green:C.b}`}}>
+                            <div style={{fontWeight:700,color:isCorrect?C.green:C.t3,marginBottom:6,fontSize:12}}>
+                              {opt}{isCorrect?" ✓":""}
                             </div>
                             {url
                               ?<img src={url} alt={`Option ${opt}`} style={{width:"100%",maxHeight:100,objectFit:"contain",borderRadius:4}}/>
@@ -1069,16 +1190,19 @@ export default function NeetaraAdmin() {
                     </div>
                   ):(
                     <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                      {["A","B","C","D"].map(opt=>(
-                        <div key={opt} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:8,
-                          background:form.correct===opt?`${C.green}12`:C.card,border:`1px solid ${form.correct===opt?C.green:C.b}`}}>
-                          <span style={{fontWeight:700,color:form.correct===opt?C.green:C.t3,width:18}}>{opt}</span>
-                          <span style={{fontSize:13,color:form.correct===opt?C.t:C.t2,fontFamily:"serif"}}>
-                            <MathText t={form[`option_${opt.toLowerCase()}`]||""}/>{!form[`option_${opt.toLowerCase()}`]&&<span style={{color:C.t4}}>—</span>}
-                          </span>
-                          {form.correct===opt&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
-                        </div>
-                      ))}
+                      {["A","B","C","D"].map(opt=>{
+                        const isCorrect=(form.correct||"").includes(opt);
+                        return(
+                          <div key={opt} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 12px",borderRadius:8,
+                            background:isCorrect?`${C.green}12`:C.card,border:`1px solid ${isCorrect?C.green:C.b}`}}>
+                            <span style={{fontWeight:700,color:isCorrect?C.green:C.t3,width:18}}>{opt}</span>
+                            <span style={{fontSize:13,color:isCorrect?C.t:C.t2,fontFamily:"serif"}}>
+                              <MathText t={form[`option_${opt.toLowerCase()}`]||""}/>{!form[`option_${opt.toLowerCase()}`]&&<span style={{color:C.t4}}>—</span>}
+                            </span>
+                            {isCorrect&&<span style={{marginLeft:"auto",fontSize:11,color:C.green}}>✓ Correct</span>}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   <div style={{marginTop:10,fontSize:10,color:C.t4}}>
