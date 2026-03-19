@@ -784,7 +784,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-            )}
+           
           </div>
         )}
 
