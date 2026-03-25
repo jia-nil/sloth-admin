@@ -787,7 +787,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-            
+            )}
           </div>
         )}
 
@@ -889,7 +889,11 @@ export default function NeetaraAdmin() {
                     {v:"Decimal", l:"Decimal",      hint:"+4 / 0"},
                   ].map(t=>(
                     <button key={t.v}
-                      onClick={()=>setForm(f=>({...f,question_type:t.v,correct:"",
+                      onClick={()=>setForm(f=>({...f,
+                        question_type:t.v,
+                        correct:"",
+                        marks: t.v==="SCQ"?3 : t.v==="MSQ"?4 : 4,
+                        negative: t.v==="SCQ"?-1 : t.v==="MSQ"?-2 : 0,
                         // clear options for numerical types
                         ...(t.v==="Integer"||t.v==="Decimal"?{option_a:"",option_b:"",option_c:"",option_d:""}:{})
                       }))}
