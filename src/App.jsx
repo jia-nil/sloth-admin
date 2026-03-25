@@ -92,7 +92,7 @@ const wColor    = w => w==="H"?C.red:w==="M"?C.gold:C.t3;
 
 const BLANK_Q = {
   slug:"",subject:"Physics",topic:"Kinematics",subtopic:"",
-  exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",
+  exam:"JEE Advanced",year:2024,paper:"P1",session:"",shift:"",qno:1,
   question_text:"",option_a:"",option_b:"",option_c:"",option_d:"",correct:"A",
   solution:"",concept:"",tip:"",diagram_url:"",solution_diagram_url:"",answer_type:"text",partial_marks:null,
   difficulty:"Medium",weightage:"M",question_type:"SCQ",
@@ -787,7 +787,7 @@ export default function NeetaraAdmin() {
                   Next →
                 </button>
               </div>
-            
+            )}
           </div>
         )}
 
@@ -844,6 +844,11 @@ export default function NeetaraAdmin() {
                 </Field>
                 <Field label="Paper (Morning = P1, Evening = P2)">
                   <input placeholder="Morning (P1) / Evening (P2)" value={form.shift||""} onChange={e=>setForm(f=>({...f,shift:e.target.value}))}/>
+                </Field>
+                <Field label="Question No. (qno)">
+                  <input type="number" min="1" max="54" placeholder="e.g. 1"
+                    value={form.qno||""}
+                    onChange={e=>setForm(f=>({...f,qno:parseInt(e.target.value)||1}))}/>
                 </Field>
               </div>
               <Field label="Source Note">
