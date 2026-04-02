@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-
+import 'katex/dist/katex.min.css';
 // ─────────────────────────────────────────────────────────────────────────────
 // NEETARA — Question Bank Admin Panel
 // Connects to Supabase. Replace SUPABASE_URL and SUPABASE_ANON_KEY.
