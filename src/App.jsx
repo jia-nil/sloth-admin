@@ -1,14 +1,9 @@
 import { useState, useEffect, useRef } from "react";
 import 'katex/dist/katex.min.css';
-// ─────────────────────────────────────────────────────────────────────────────
-// NEETARA — Question Bank Admin Panel
-// Connects to Supabase. Replace SUPABASE_URL and SUPABASE_ANON_KEY.
-// Admin users only — protected by RLS on the questions table.
-// ─────────────────────────────────────────────────────────────────────────────
 
-const SUPABASE_URL  = "https://tlmazdrnndylafhfxsrc.supabase.co";
-const SUPABASE_KEY  = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRsbWF6ZHJubmR5bGFmaGZ4c3JjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI1ODEwNjAsImV4cCI6MjA4ODE1NzA2MH0.gGPknDEdaGfzDb2JJ2amEY9b33jlbTY3brvbbhvvIWg";
 
+const SUPABASE_URL  = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY  = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const SUBJECTS = ["Physics","Chemistry","Mathematics"];
 const TOPICS = {
   Physics:["Kinematics","Laws of Motion","Work & Energy","Rotational Motion","Gravitation",
@@ -29,7 +24,7 @@ const DIFFICULTIES = ["Easy","Medium","Hard"];
 const WEIGHTAGES = ["H","M","L"];
 const EXAMS = ["JEE Main","JEE Advanced"];
 
-// ── Supabase client (lightweight, no SDK needed) ──────────────────────────
+
 const sb = {
   async query(table, params = {}) {
     const url = new URL(`${SUPABASE_URL}/rest/v1/${table}`);
